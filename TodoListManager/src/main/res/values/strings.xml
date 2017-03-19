@@ -1,3 +1,7 @@
 <resources>
-    <string name="app_name">ex2</string>
+    <string name="app_name">TodoListManager</string>
+    <string name="job_message">Enter a task:</string>
+    <string name="add_button">Add</string>
+
+    <string name="menu_delete">Delete</string>
 </resources>
