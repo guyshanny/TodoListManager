@@ -1,8 +1,10 @@
 package com.example.guy.ex2;
 
 import android.graphics.Color;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.view.ActionMode;
 import android.view.Menu;
@@ -10,13 +12,12 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
+import android.widget.AbsListView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
-
 import java.util.ArrayList;
 
 
@@ -24,7 +25,6 @@ public class MainActivity extends AppCompatActivity {
 
     private ArrayList<String> _jobs;
     private ArrayAdapter<String> _jobsAdapter;
-    private ActionMode _actionMode;
 
     @Override
     protected void onSaveInstanceState(Bundle outState)
@@ -68,32 +68,90 @@ public class MainActivity extends AppCompatActivity {
         _populateJobsListView();
         final ListView lv = (ListView)findViewById(R.id.todoList);
 
-        /*
-         * Sets the ListView long click's event listener
-         * and registering a context menu (with delete button)
-         */
-        registerForContextMenu(lv);
-
-        lv.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+        // Sets the ListView long click's event listener for multiple choice
+        lv.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE_MODAL);
+        lv.setMultiChoiceModeListener(new AbsListView.MultiChoiceModeListener() {
             @Override
-            public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-
-                //MainActivity.this._jobsAdapter.setsele
-
-
-                MainActivity.this._jobsAdapter.remove(MainActivity.this._jobs.get(position));
-                MainActivity.this._jobsAdapter.notifyDataSetChanged();
+            public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+                MenuInflater inflater = mode.getMenuInflater();
+                inflater.inflate(R.menu.context_main, menu);
 
                 return true;
+            }
+
+            @Override
+            public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+                return false;
+            }
+
+            @Override
+            public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+                // Respond to clicks on the actions in the CAB
+                switch (item.getItemId())
+                {
+                    case R.id.menu_delete:
+                    {
+                        Log.d("TAG1", "deleteSelectedItems");
+                        SparseBooleanArray checkedItems = lv.getCheckedItemPositions();
+
+                        if (null == checkedItems)
+                        {
+                            return false;
+                        }
+
+                        ArrayList<String> updatedList = new ArrayList<String>();
+                        for (int i = 0 ; i < lv.getCount() ; i++)
+                        {
+                            if (!(checkedItems.get(i))) // This item has to stay
+                            {
+                                updatedList.add(MainActivity.this._jobs.get(i));
+                            }
+                        }
+
+                        MainActivity.this._jobsAdapter.clear();
+                        MainActivity.this._jobsAdapter.addAll(updatedList);
+
+                        // Repeat initial background color
+                        for (int i = 0 ; i < lv.getChildCount() ; i++)
+                        {
+                            View itemView = lv.getChildAt(i);
+                            itemView.setBackgroundColor(Color.TRANSPARENT);
+                        }
+
+                        mode.finish();  // Action picked, so close the CAB
+                        return true;
+                    }
+                    default:
+                        return false;
+                }
+            }
+
+            @Override
+            public void onDestroyActionMode(ActionMode mode) {
+                // Here you can make any necessary updates to the activity when
+                // the CAB is removed. By default, selected items are deselected/unchecked.
+            }
+
+            @Override
+            public void onItemCheckedStateChanged(ActionMode mode, int position, long id, boolean checked) {
+                // Here you can do something when items are selected/de-selected,
+                // such as update the title in the CAB
+
+                View rowView = lv.getChildAt(position);
+                if (checked)
+                {
+                    rowView.setBackgroundColor(ContextCompat.getColor(getApplicationContext(), R.color.checkedItemsBackground));
+                }
+                else
+                {
+                    rowView.setBackgroundColor(Color.TRANSPARENT);
+                }
             }
         });
     }
 
-
     private void _populateJobsListView()
     {
-//        String[] items = this._jobs.toArray(new String[this._jobs.size()]);
-
         // Build Adapter
         this._jobsAdapter = new ArrayAdapter<String>(
                 this,                       // Context for the activity
@@ -107,6 +165,7 @@ public class MainActivity extends AppCompatActivity {
 
                 // Setting alternating color
                 textView.setTextColor((0 == position % 2) ? Color.RED : Color.BLUE);
+
                 return textView;
             }
         };
