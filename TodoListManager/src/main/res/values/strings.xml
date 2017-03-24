@@ -1,7 +1,8 @@
 <resources>
     <string name="app_name">TodoListManager</string>
-    <string name="job_message">Enter a task:</string>
-    <string name="add_button">Add</string>
+    <string name="job_message">My TODO App:</string>
+    <string name="add_button">Add item</string>
 
     <string name="menu_delete">Delete</string>
+    <string name="add_item_text">Add item:</string>
 </resources>

@@ -1,10 +1,11 @@
 package com.example.guy.ex2;
 
 import android.graphics.Color;
+import android.support.annotation.Nullable;
+import android.support.v4.app.FragmentManager;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.view.ActionMode;
 import android.view.Menu;
@@ -13,21 +14,25 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AbsListView;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 
 
 /**
  * The MainActivity class of our program
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements AddReminderDialog.AddItemReminderDialogListener {
 
-    private ArrayList<String> _jobs;
+    private ArrayList<Job> _jobs;
     private ArrayAdapter<String> _jobsAdapter;
+    private EditText _jobDescription;
 
     /**
      * This function handles saving the current state of the program
@@ -38,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onSaveInstanceState(Bundle outState)
     {
         super.onSaveInstanceState(outState);
-        outState.putStringArrayList("_jobs", _jobs);
+        outState.putParcelableArrayList("_jobs", _jobs);
     }
 
     /**
@@ -53,12 +58,15 @@ public class MainActivity extends AppCompatActivity {
         // Check if first run or need to reconstruct data (e.g on orientation change)
         if (null == savedInstanceState)
         {
-            _jobs = new ArrayList<String>();
+            _jobs = new ArrayList<Job>();
         }
         else
         {
-            _jobs = savedInstanceState.getStringArrayList("_jobs");
+            _jobs = savedInstanceState.getParcelableArrayList("_jobs");
         }
+
+        // Job description handle
+        this._jobDescription = (EditText)findViewById(R.id.itemText);
 
         // Sets the button event listener
         final Button addButton = (Button) findViewById(R.id.addButton);
@@ -66,13 +74,10 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v)
             {
-                final EditText jobText = (EditText) findViewById(R.id.jobText);
-
-                // Update internals
-                MainActivity.this._jobs.add(jobText.getText().toString());
-
-                // Update list view
-                _jobsAdapter.notifyDataSetChanged();
+                // Show add item's dialog
+                FragmentManager fm = getSupportFragmentManager();
+                AddReminderDialog addItemDialog = AddReminderDialog.newInstance("Add item's reminder");
+                addItemDialog.show(fm, "add_reminder_dialog");
             }
         });
 
@@ -121,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
                             return false;
                         }
 
-                        ArrayList<String> updatedList = new ArrayList<String>();
+                        ArrayList<Job> updatedList = new ArrayList<Job>();
                         for (int i = 0 ; i < lv.getCount() ; i++)
                         {
                             if (!(checkedItems.get(i))) // This item has to stay
@@ -129,9 +134,7 @@ public class MainActivity extends AppCompatActivity {
                                 updatedList.add(MainActivity.this._jobs.get(i));
                             }
                         }
-
-                        MainActivity.this._jobsAdapter.clear();
-                        MainActivity.this._jobsAdapter.addAll(updatedList);
+                        MainActivity.this.updateJobs(updatedList);
 
                         // Repeat initial background color
                         for (int i = 0 ; i < lv.getChildCount() ; i++)
@@ -187,6 +190,14 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+
+        // Sets single short click listener
+        lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+            }
+        });
     }
 
     /**
@@ -195,11 +206,17 @@ public class MainActivity extends AppCompatActivity {
      */
     private void _populateJobsListView()
     {
+        String[] items = new String[this._jobs.size()];
+        for (int i = 0 ; i < this._jobs.size() ; i++)
+        {
+            items[i] = this._jobs.get(i).getJobDescription() + "           " + this._jobs.get(i).getJobReminderDate();
+        }
+
         // Build Adapter
         this._jobsAdapter = new ArrayAdapter<String>(
                 this,                       // Context for the activity
                 R.layout.jobs_list,         // Layout to use (create)
-                _jobs                       // Items to be displayed
+                items                       // Items to be displayed
         ) {
             /**
              * {@inheritDoc}
@@ -221,5 +238,31 @@ public class MainActivity extends AppCompatActivity {
         // Configure the list view
         ListView lv = (ListView)findViewById(R.id.todoList);
         lv.setAdapter(this._jobsAdapter);
+    }
+
+    @Override
+    public void onFinishAddItemDialog(@Nullable String reminderDescription, @Nullable Calendar reminderDate, Boolean isAddReminder)
+    {
+        Job job;
+        if (isAddReminder)
+        {
+            job = new Job(this._jobDescription.getText().toString(), new Job.Reminder(reminderDescription, reminderDate));
+        }
+        else
+        {
+            job = new Job(this._jobDescription.getText().toString(), null);
+        }
+
+        // Update internals
+        this._jobs.add(job);
+
+        // Update list view
+        this.updateJobs(null);
+    }
+
+    public void updateJobs(@Nullable ArrayList<Job> newJobs)
+    {
+        this._jobs = null != newJobs ? newJobs : this._jobs;
+        this._populateJobsListView();
     }
 }
