@@ -1,6 +1,12 @@
 package com.example.guy.ex2;
 
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.support.annotation.Nullable;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.content.ContextCompat;
@@ -20,13 +26,18 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
+import com.example.guy.ex2.actions.CallAction;
+import com.example.guy.ex2.actions.CancelAction;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 
 
 /**
  * The MainActivity class of our program
+ * It extends the AppComat activity
+ * Also, it implements the 'AddReminderDialog.AddItemReminderDialogListener'
+ * as a contract with 'AddReminderDialog' about handling a new reminder
  */
 public class MainActivity extends AppCompatActivity implements AddReminderDialog.AddItemReminderDialogListener {
 
@@ -71,6 +82,9 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
         // Sets the button event listener
         final Button addButton = (Button) findViewById(R.id.addButton);
         addButton.setOnClickListener(new View.OnClickListener() {
+            /**
+             * {@inheritDoc}
+             */
             @Override
             public void onClick(View v)
             {
@@ -191,11 +205,27 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
             }
         });
 
-        // Sets single short click listener
+        // Sets single short click listener - single-choice AlertDialog
         lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            /**
+             * {@inheritDoc}
+             *
+             * Note it gets the clicked job and show it's
+             * reminder's dialog using it's reminder's actions
+             */
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 
+                final Job jobClicked = MainActivity.this._jobs.get(position);
+
+                if (null == jobClicked.getJobReminder())
+                {
+                    MainActivity.this.notifyMessage("This job doesn't have a reminder");
+                    return;
+                }
+
+                ReminderOptionsDialog reminderDialog = ReminderOptionsDialog.newInstance(jobClicked, MainActivity.this);
+                reminderDialog.show(getSupportFragmentManager(), "reminderDialog");
             }
         });
     }
@@ -240,18 +270,45 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
         lv.setAdapter(this._jobsAdapter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void onFinishAddItemDialog(@Nullable String reminderDescription, @Nullable Calendar reminderDate, Boolean isAddReminder)
     {
+        // Dismiss adding job
+        if (null == reminderDescription)
+        {
+            return;
+        }
+
         Job job;
         if (isAddReminder)
         {
             job = new Job(this._jobDescription.getText().toString(), new Job.Reminder(reminderDescription, reminderDate));
+
+            // Check if needs to add 'call' action
+            try {
+                // Splitting "call 97250391827" to "call" & "97250391827"
+                String[] splittedJobDesc = reminderDescription.split(" ");
+
+                if ((splittedJobDesc.length > 1) && (splittedJobDesc[0].toLowerCase().equals(getString(R.string.call_action_name).toLowerCase())))
+                {
+                    job.getJobReminder().addAction(new CallAction(getString(R.string.call_action_name), splittedJobDesc[1]));
+                }
+            }
+            catch (Exception e)
+            {
+                MainActivity.this.notifyMessage("couldn't extract reminder name");
+            }
         }
         else
         {
             job = new Job(this._jobDescription.getText().toString(), null);
         }
+
+        // Add default cancel action
+        job.getJobReminder().addAction(new CancelAction(getString(R.string.cancel_action_name)));
 
         // Update internals
         this._jobs.add(job);
@@ -260,9 +317,25 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
         this.updateJobs(null);
     }
 
+    /**
+     * Updates & refreshes the job's ListView
+     * @param newJobs list of new jobs, or null if only needs to be refreshed
+     */
     public void updateJobs(@Nullable ArrayList<Job> newJobs)
     {
         this._jobs = null != newJobs ? newJobs : this._jobs;
         this._populateJobsListView();
+    }
+
+    /**
+     * Notify the user for an action
+     * It notify using a small ellipse message box
+     *
+     * @param message the message to notify
+     */
+    public void notifyMessage(String message)
+    {
+        Toast toast = Toast.makeText(getApplicationContext(), message, Toast.LENGTH_SHORT);
+        toast.show();
     }
 }

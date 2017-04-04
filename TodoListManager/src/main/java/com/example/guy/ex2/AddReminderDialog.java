@@ -13,7 +13,6 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 
 import java.util.Calendar;
-import java.util.Date;
 
 /**
  * It is a custom dialog for adding new job
@@ -28,21 +27,36 @@ public class AddReminderDialog extends DialogFragment implements DatePickerDialo
     private ImageButton _cancelButton;
     private DatePicker _dp;
 
-    // Defines the listener interface with a method passing back data result
+    /**
+     * Defines the listener interface with a method passing back data result
+     */
     public interface AddItemReminderDialogListener
     {
-        void onFinishAddItemDialog(String reminderDescription,
+        /**
+         * Handles what to do when adding a new reminder
+         * @param reminderDescription the reminder's description
+         * @param reminderDate the reminder's due date
+         * @param isAddReminder true iff we've to add new reminder and false otherwise(dismiss)
+         */
+        void onFinishAddItemDialog(@Nullable String reminderDescription,
                                    @Nullable Calendar reminderDate,
                                    Boolean isAddReminder);
     }
 
+    /**
+     * Empty constructor is required for DialogFragment
+     * Make sure not to add arguments to the constructor
+     * Use `newInstance` instead as shown below
+     */
     public AddReminderDialog()
     {
-        // Empty constructor is required for DialogFragment
-        // Make sure not to add arguments to the constructor
-        // Use `newInstance` instead as shown below
     }
 
+    /**
+     * Gets an instance for the reminder's dialog
+     * @param title dialog's title
+     * @return a dialog handle
+     */
     public static AddReminderDialog newInstance(String title)
     {
         AddReminderDialog frag = new AddReminderDialog();
@@ -53,6 +67,9 @@ public class AddReminderDialog extends DialogFragment implements DatePickerDialo
         return frag;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState)
     {
@@ -66,6 +83,9 @@ public class AddReminderDialog extends DialogFragment implements DatePickerDialo
         return dialogView;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void onViewCreated(final View view, @Nullable Bundle savedInstanceState)
     {
@@ -120,9 +140,11 @@ public class AddReminderDialog extends DialogFragment implements DatePickerDialo
         getDialog().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void onDateSet(DatePicker view, int year, int month, int dayOfMonth)
     {
-
     }
 }
