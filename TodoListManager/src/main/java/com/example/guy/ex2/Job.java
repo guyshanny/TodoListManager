@@ -1,42 +1,67 @@
 package com.example.guy.ex2;
 
-import android.os.Parcel;
-import android.os.Parcelable;
-import android.support.annotation.Nullable;
 import com.example.guy.ex2.actions.Action;
+import com.google.firebase.database.Exclude;
+
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * This obj handles a Job in the job list
  */
-public class Job implements Parcelable {
+public class Job
+{
     /**
      * Represents a reminder for the job
      */
-    public static class Reminder {
-        public String description;
-        public Calendar date;
-        public ArrayList<Action> actions;
+    public static class Reminder
+    {
+        private String description;
+        private Map<String, Integer> date;
+        private List<Action> actions;
+
+        public Reminder()
+        {
+            // Need for firebase
+        }
 
         /**
          * C'tor for the reminder
-         * @param _description the reminder's description
-         * @param _date the reminder's date
+         * @param description the reminder's description
+         * @param date the reminder's date
          */
-        public Reminder(String _description, @Nullable Calendar _date) {
-            this.description = _description;
-            this.date = _date;
-            this.actions = new ArrayList<Action>();
+        public Reminder(String description, Calendar date)
+        {
+            this.description = description;
+            this.actions = new ArrayList<>();
+            this.date = new HashMap<>();
+
+            this.date.put("day", date.get(Calendar.DAY_OF_MONTH));
+            this.date.put("month", date.get(Calendar.MONTH));
+            this.date.put("year", date.get(Calendar.YEAR));
         }
 
         /**
          * Copy c'tor
-         * @param _reminder other obj
+         * @param reminder other obj
          */
-        public Reminder(Reminder _reminder) {
-            this(_reminder.description, _reminder.date);
+        public Reminder(Reminder reminder)
+        {
+            this.description = reminder.getDescription();
+            this.actions = new ArrayList<>();
+            this.date = reminder.getDate();
         }
+
+
+        public String getDescription() { return this.description; }
+        public void setDescription(String description) { this.description = description; }
+        public Map<String, Integer> getDate() { return this.date; }
+        public void setDate(Map<String, Integer> date) { this.date = date; }
+        public List<Action> getActions() { return this.actions; }
+        public void setActions(List<Action> actions) { this.actions = actions; }
 
         /**
          * Adding action to the reminder's actions list
@@ -48,12 +73,13 @@ public class Job implements Parcelable {
          * Gets reminder's actions' names
          * @return actions' name as a list
          */
+        @Exclude
         public String[] getActionsNames()
         {
             String[] names = new String[this.actions.size()];
             for (int i = 0 ; i < this.actions.size() ; i++)
             {
-                names[i] = this.actions.get(i).getActionName();
+                names[i] = this.actions.get(i).getActionType();
             }
             return names;
         }
@@ -67,7 +93,10 @@ public class Job implements Parcelable {
     /**
      * Job's c'tor
      */
-    public Job() {}
+    public Job()
+    {
+        // Needed for Firebase
+    }
 
     /**
      * Job c'tor
@@ -78,28 +107,6 @@ public class Job implements Parcelable {
     {
         this._jobDescription = jobDescription;
         this._reminder = reminder;
-    }
-
-    /**
-     * Job's serializable c'tor
-     * @param in input stream
-     */
-    private Job(Parcel in)
-    {
-        this._jobDescription = in.readString();
-        int isHasReminder = in.readInt();
-        if (1 == isHasReminder)
-        {
-            Calendar reminderDate = Calendar.getInstance();
-            reminderDate.set(Calendar.YEAR, in.readInt());
-            reminderDate.set(Calendar.MONTH, in.readInt());
-            reminderDate.set(Calendar.DAY_OF_MONTH, in.readInt());
-            this._reminder = new Reminder(in.readString(), reminderDate);
-        }
-        else
-        {
-            this._reminder = null;
-        }
     }
 
     /**
@@ -142,14 +149,15 @@ public class Job implements Parcelable {
      * Getter for job's reminder's date
      * @return job's reminder's date
      */
+    @Exclude
     public String getJobReminderDate()
     {
         if (null != this._reminder)
         {
-            return Integer.toString(this._reminder.date.get(Calendar.YEAR)) + "/" +
-                    Integer.toString(this._reminder.date.get(Calendar.MONTH)) + "/" +
-                    Integer.toString(this._reminder.date.get(Calendar.DAY_OF_MONTH));
-
+            Map<String, Integer> date = this._reminder.getDate();
+            return Integer.toString(date.get("year")) + "/" +
+                    Integer.toString(date.get("month")) + "/" +
+                    Integer.toString(date.get("day"));
         }
         else
         {
@@ -165,57 +173,9 @@ public class Job implements Parcelable {
         this._reminder = null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public int describeContents() { return 0; }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void writeToParcel(Parcel dest, int flags)
+    public String toString()
     {
-        dest.writeString(this._jobDescription);
-        if (null != this._reminder)
-        {
-            dest.writeInt(1);   // Indicator for writing date (it my be null)
-            dest.writeString(this._reminder.description);
-            dest.writeInt(this._reminder.date.get(Calendar.YEAR));
-            dest.writeInt(this._reminder.date.get(Calendar.MONTH));
-            dest.writeInt(this._reminder.date.get(Calendar.DAY_OF_MONTH));
-        }
-        else
-        {
-            dest.writeInt(0); // Indicator for not writing date (it my be null)
-        }
+        return this.getJobDescription() + "           " + this.getJobReminderDate();
     }
-
-    /**
-     * A creator for the loading operation that is being triggered in onCreate
-     * while we reconstruct our internal params
-     */
-    public static final Parcelable.Creator<Job> CREATOR = new Parcelable.Creator<Job>()
-    {
-        /**
-         * Creates the object from a given stream
-         * @param in a handler to a stream we've saved our state in
-         * @return a ChatMessage obj filled with the state in 'in'
-         */
-        public Job createFromParcel(Parcel in)
-        {
-            return new Job(in);
-        }
-
-        /**
-         * C'tor for an array of obj. Needed as a part of the Parcelable abstraction
-         * @param size of array
-         * @return an array of ChatMessage obj
-         */
-        public Job[] newArray(int size)
-        {
-            return new Job[size];
-        }
-    };
 }

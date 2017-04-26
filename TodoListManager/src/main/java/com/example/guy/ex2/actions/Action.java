@@ -1,36 +1,67 @@
 package com.example.guy.ex2.actions;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
 
 /**
  * Created by GUY on 4/3/2017.
  */
 
 /**
- * An abstract class represents an action for a reminder
+ * A class represents an action for a reminder
  */
-public abstract class Action extends Activity
+//public class Action extends Activity
+public class Action
 {
-    private String _actionName;
+    private String _actionType;
+    private String _params;
+
+    public Action()
+    {
+        // For firebase
+    }
 
     /**
      * C'tor for the action's obj
-     * @param actionName the action's name
+     * @param actionType the action's name
      */
-    public Action(String actionName)
+    public Action(String actionType, String params)
     {
-        this._actionName = actionName;
+        this._actionType = actionType;
+        this._params = params;
+    }
+
+    public Action(String actionType)
+    {
+        this._actionType = actionType;
     }
 
     /**
      * Runs the actions
      * @param args varags to the action
      */
-    public abstract void run(Object... args);
+    public void run(Object... args)
+    {
+        if (this._actionType.equals("call"))
+        {
+            /*
+             * Start a dialer and pass it the phone
+             * (pay attention, without 'tel' prefix, it will throw 'IllegalStateException' exception)
+             */
+            Activity mainActivityContext = (Activity)args[0];
+            Intent intent = new Intent(Intent.ACTION_DIAL);
+            intent.setData(Uri.parse("tel:" + this._params));
+            mainActivityContext.startActivity(intent);
+        }
+    }
 
     /**
      * Getter for the action's name
      * @return the action's name
      */
-    public String getActionName() { return this._actionName; }
+    public String getActionType() { return this._actionType; }
+    public void setActionType(String actionName) { this._actionType = actionName; }
+    public String getParams() { return this._params; }
+    public void setParams(String params) {this._params = params;}
 }

@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.support.v4.app.DialogFragment;
+
 import com.example.guy.ex2.actions.Action;
 
 /**
@@ -59,14 +60,14 @@ public class ReminderOptionsDialog extends DialogFragment
         final String[] actionsNames = this._job.getJobReminder().getActionsNames();
 
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setTitle(this._job.getJobReminder().description)
+        builder.setTitle(this._job.getJobReminder().getDescription())
                 .setItems(actionsNames, new DialogInterface.OnClickListener() {
                     /**
                      * {@inheritDoc}
                      */
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        Action action = ReminderOptionsDialog.this._job.getJobReminder().actions.get(which);
+                        Action action = ReminderOptionsDialog.this._job.getJobReminder().getActions().get(which);
                         switch (actionsNames[which])
                         {
                             case "cancel":

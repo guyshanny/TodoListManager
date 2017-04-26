@@ -1,12 +1,6 @@
 package com.example.guy.ex2;
 
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.Context;
-import android.content.DialogInterface;
-import android.content.Intent;
 import android.graphics.Color;
-import android.net.Uri;
 import android.support.annotation.Nullable;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.content.ContextCompat;
@@ -18,7 +12,6 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -27,8 +20,14 @@ import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
-import com.example.guy.ex2.actions.CallAction;
-import com.example.guy.ex2.actions.CancelAction;
+
+import com.example.guy.ex2.actions.Action;
+import com.firebase.ui.database.FirebaseListAdapter;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+
+import org.w3c.dom.Text;
+
 import java.util.ArrayList;
 import java.util.Calendar;
 
@@ -41,20 +40,21 @@ import java.util.Calendar;
  */
 public class MainActivity extends AppCompatActivity implements AddReminderDialog.AddItemReminderDialogListener {
 
+    // Internal structures
     private ArrayList<Job> _jobs;
     private ArrayAdapter<String> _jobsAdapter;
-    private EditText _jobDescription;
+    private FirebaseListAdapter _lvAdapter;
+    private DatabaseReference _dbRef;
 
-    /**
-     * This function handles saving the current state of the program
-     * (it is called after 'onDestory' is being called. E.g after changing orientation
-     * @param outState the current state (handle to a bulk of memory to save in)
-     */
+    // UI handlers
+    private EditText _jobDescription;
+    private ListView _lv;
+
     @Override
-    protected void onSaveInstanceState(Bundle outState)
+    protected void onDestroy()
     {
-        super.onSaveInstanceState(outState);
-        outState.putParcelableArrayList("_jobs", _jobs);
+        super.onDestroy();
+        this._lvAdapter.cleanup();
     }
 
     /**
@@ -66,18 +66,12 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Check if first run or need to reconstruct data (e.g on orientation change)
-        if (null == savedInstanceState)
-        {
-            _jobs = new ArrayList<Job>();
-        }
-        else
-        {
-            _jobs = savedInstanceState.getParcelableArrayList("_jobs");
-        }
-
-        // Job description handle
+        // Gets UI handlers
         this._jobDescription = (EditText)findViewById(R.id.itemText);
+        this._lv = (ListView)findViewById(R.id.todoList);
+
+        // Gets db reference (root)
+        this._dbRef = FirebaseDatabase.getInstance().getReference();
 
         // Sets the button event listener
         final Button addButton = (Button) findViewById(R.id.addButton);
@@ -97,11 +91,10 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
 
         // Populate ListView data source
         _populateJobsListView();
-        final ListView lv = (ListView)findViewById(R.id.todoList);
 
         // Sets the ListView long click's event listener for multiple choice
-        lv.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE_MODAL /*for multiple choice ListView*/);
-        lv.setMultiChoiceModeListener(new AbsListView.MultiChoiceModeListener() {
+        this._lv.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE_MODAL /*for multiple choice ListView*/);
+        this._lv.setMultiChoiceModeListener(new AbsListView.MultiChoiceModeListener() {
             /**
              * {@inheritDoc}
              */
@@ -133,7 +126,7 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
                 {
                     case R.id.menu_delete:
                     {
-                        SparseBooleanArray checkedItems = lv.getCheckedItemPositions();
+                        SparseBooleanArray checkedItems = MainActivity.this._lv.getCheckedItemPositions();
 
                         if (null == checkedItems)
                         {
@@ -141,7 +134,7 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
                         }
 
                         ArrayList<Job> updatedList = new ArrayList<Job>();
-                        for (int i = 0 ; i < lv.getCount() ; i++)
+                        for (int i = 0 ; i < MainActivity.this._lv.getCount() ; i++)
                         {
                             if (!(checkedItems.get(i))) // This item has to stay
                             {
@@ -151,9 +144,9 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
                         MainActivity.this.updateJobs(updatedList);
 
                         // Repeat initial background color
-                        for (int i = 0 ; i < lv.getChildCount() ; i++)
+                        for (int i = 0 ; i < MainActivity.this._lv.getChildCount() ; i++)
                         {
-                            View itemView = lv.getChildAt(i);
+                            View itemView = MainActivity.this._lv.getChildAt(i);
                             itemView.setBackgroundColor(Color.TRANSPARENT);
                         }
 
@@ -191,7 +184,7 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
                  * from the current visible index (not 0, because we've rolled down), so we'll
                  * get a null ptr which leads to nullptr reference exception.
                  */
-                View rowView = lv.getChildAt(position - lv.getFirstVisiblePosition());
+                View rowView = MainActivity.this._lv.getChildAt(position - MainActivity.this._lv.getFirstVisiblePosition());
                 if (checked)
                 {
                     // Highlight background
@@ -206,7 +199,7 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
         });
 
         // Sets single short click listener - single-choice AlertDialog
-        lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        this._lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             /**
              * {@inheritDoc}
              *
@@ -236,38 +229,27 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
      */
     private void _populateJobsListView()
     {
-        String[] items = new String[this._jobs.size()];
-        for (int i = 0 ; i < this._jobs.size() ; i++)
-        {
-            items[i] = this._jobs.get(i).getJobDescription() + "           " + this._jobs.get(i).getJobReminderDate();
-        }
-
-        // Build Adapter
-        this._jobsAdapter = new ArrayAdapter<String>(
-                this,                       // Context for the activity
-                R.layout.jobs_list,         // Layout to use (create)
-                items                       // Items to be displayed
-        ) {
+        this._lvAdapter = new FirebaseListAdapter<Job>(this, Job.class, R.layout.jobs_list, this._dbRef) {
             /**
              * {@inheritDoc}
              *
              * Note we override this function to be able to change the ListView's text's color
              */
             @Override
-            public View getView(final int position, View convertView, ViewGroup parent)
+            protected void populateView(View view, Job job, int position)
             {
-                TextView textView = (TextView)super.getView(position, convertView, parent);
+                TextView textView = (TextView)view.findViewById(R.id.jobsText);
+
+                // Setting the job's row's text
+                textView.setText(job.toString());
 
                 // Setting alternating color
                 textView.setTextColor((0 == position % 2) ? Color.RED : Color.BLUE);
-
-                return textView;
             }
         };
 
-        // Configure the list view
-        ListView lv = (ListView)findViewById(R.id.todoList);
-        lv.setAdapter(this._jobsAdapter);
+        // Setting data adapter for the ListView obj
+        this._lv.setAdapter(this._lvAdapter);
     }
 
     /**
@@ -290,16 +272,17 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
             // Check if needs to add 'call' action
             try {
                 // Splitting "call 97250391827" to "call" & "97250391827"
-                String[] splittedJobDesc = reminderDescription.split(" ");
+                String[] splittedReminderDesc = reminderDescription.split(" ");
 
-                if ((splittedJobDesc.length > 1) && (splittedJobDesc[0].toLowerCase().equals(getString(R.string.call_action_name).toLowerCase())))
+                if ((splittedReminderDesc.length > 1) && (splittedReminderDesc[0].toLowerCase().equals(getString(R.string.call_action_name).toLowerCase())))
                 {
-                    job.getJobReminder().addAction(new CallAction(getString(R.string.call_action_name), splittedJobDesc[1]));
+                    job.getJobReminder().addAction(new Action(getString(R.string.call_action_name), splittedReminderDesc[1]));
                 }
             }
             catch (Exception e)
             {
                 MainActivity.this.notifyMessage("couldn't extract reminder name");
+                return;
             }
         }
         else
@@ -308,13 +291,13 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
         }
 
         // Add default cancel action
-        job.getJobReminder().addAction(new CancelAction(getString(R.string.cancel_action_name)));
+        job.getJobReminder().addAction(new Action(getString(R.string.cancel_action_name)));
 
-        // Update internals
-        this._jobs.add(job);
+        // Get data from Firebase db
+        MainActivity.this._dbRef.push().setValue(job);
 
-        // Update list view
-        this.updateJobs(null);
+        // Notify
+        MainActivity.this.notifyMessage("Job has been successfully added to the list");
     }
 
     /**

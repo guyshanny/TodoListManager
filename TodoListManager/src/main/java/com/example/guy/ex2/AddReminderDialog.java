@@ -19,7 +19,6 @@ import java.util.Calendar;
  * We've implemented it as a singleton
  * based on https://guides.codepath.com/android/Using-DialogFragment
  */
-//public class AddItemDialog extends DialogFragment implements DatePickerDialog.OnDateSetListener
 public class AddReminderDialog extends DialogFragment implements DatePickerDialog.OnDateSetListener
 {
     private EditText _jobText;
