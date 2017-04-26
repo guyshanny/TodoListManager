@@ -57,8 +57,11 @@ public class Action
     }
 
     /**
-     * Getter for the action's name
-     * @return the action's name
+     * Getters && Setters (needed for the Firebase database processing
+     * This handles the db keys' names (not the internal variable's name)
+     *
+     * If there is a getter || setter that we don't want the db manager to process, just put
+     * a @Except before the method's deceleration
      */
     public String getActionType() { return this._actionType; }
     public void setActionType(String actionName) { this._actionType = actionName; }

@@ -14,21 +14,18 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import com.example.guy.ex2.actions.Action;
 import com.firebase.ui.database.FirebaseListAdapter;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-
-import org.w3c.dom.Text;
-
-import java.util.ArrayList;
+import com.google.firebase.database.ValueEventListener;
 import java.util.Calendar;
 
 
@@ -41,15 +38,16 @@ import java.util.Calendar;
 public class MainActivity extends AppCompatActivity implements AddReminderDialog.AddItemReminderDialogListener {
 
     // Internal structures
-    private ArrayList<Job> _jobs;
-    private ArrayAdapter<String> _jobsAdapter;
-    private FirebaseListAdapter _lvAdapter;
-    private DatabaseReference _dbRef;
+    private FirebaseListAdapter _lvAdapter; // FirebaseUI adapter
+    private DatabaseReference _dbRef;   // Firebase reference
 
     // UI handlers
     private EditText _jobDescription;
     private ListView _lv;
 
+    /**
+     * Handles destroying of the activity
+     */
     @Override
     protected void onDestroy()
     {
@@ -92,6 +90,12 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
         // Populate ListView data source
         _populateJobsListView();
 
+        // Notify of changes (so we will update with no need to push)
+        this._lvAdapter.notifyDataSetChanged();
+
+        // Notify the user that data is loading
+        this.notifyMessage("Getting data (if there is)", Toast.LENGTH_LONG);
+
         // Sets the ListView long click's event listener for multiple choice
         this._lv.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE_MODAL /*for multiple choice ListView*/);
         this._lv.setMultiChoiceModeListener(new AbsListView.MultiChoiceModeListener() {
@@ -133,15 +137,14 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
                             return false;
                         }
 
-                        ArrayList<Job> updatedList = new ArrayList<Job>();
+                        // Deleting
                         for (int i = 0 ; i < MainActivity.this._lv.getCount() ; i++)
                         {
-                            if (!(checkedItems.get(i))) // This item has to stay
+                            if (checkedItems.get(i))
                             {
-                                updatedList.add(MainActivity.this._jobs.get(i));
+                                MainActivity.this._lvAdapter.getRef(i).removeValue();
                             }
                         }
-                        MainActivity.this.updateJobs(updatedList);
 
                         // Repeat initial background color
                         for (int i = 0 ; i < MainActivity.this._lv.getChildCount() ; i++)
@@ -207,18 +210,41 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
              * reminder's dialog using it's reminder's actions
              */
             @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id)
+            {
+                // Getting the clicked node's db reference
+                final DatabaseReference jobReference = MainActivity.this._lvAdapter.getRef(position);
 
-                final Job jobClicked = MainActivity.this._jobs.get(position);
+                // It triggers once and then does not trigger again
+                jobReference.addListenerForSingleValueEvent(new ValueEventListener() {
+                    /**
+                     * {@inheritDoc}
+                     * @param dataSnapshot snapshot of the node's data
+                     */
+                    @Override
+                    public void onDataChange(DataSnapshot dataSnapshot) {
+                        Job job = dataSnapshot.getValue(Job.class);
 
-                if (null == jobClicked.getJobReminder())
-                {
-                    MainActivity.this.notifyMessage("This job doesn't have a reminder");
-                    return;
-                }
+                        if (null == job.getJobReminder())
+                        {
+                            MainActivity.this.notifyMessage("This job doesn't have a reminder");
+                            return;
+                        }
 
-                ReminderOptionsDialog reminderDialog = ReminderOptionsDialog.newInstance(jobClicked, MainActivity.this);
-                reminderDialog.show(getSupportFragmentManager(), "reminderDialog");
+                        // Starting the reminder's dialog
+                        ReminderOptionsDialog reminderDialog = ReminderOptionsDialog.newInstance(job, jobReference, MainActivity.this);
+                        reminderDialog.show(getSupportFragmentManager(), "reminderDialog");
+
+                    }
+
+                    /**
+                     * {@inheritDoc}
+                     */
+                    @Override
+                    public void onCancelled(DatabaseError databaseError) {
+                        // Does nothing right now
+                    }
+                });
             }
         });
     }
@@ -229,6 +255,7 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
      */
     private void _populateJobsListView()
     {
+        // Creating ListView data adapter. Uses FirebaseUI ListView adapter
         this._lvAdapter = new FirebaseListAdapter<Job>(this, Job.class, R.layout.jobs_list, this._dbRef) {
             /**
              * {@inheritDoc}
@@ -293,7 +320,7 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
         // Add default cancel action
         job.getJobReminder().addAction(new Action(getString(R.string.cancel_action_name)));
 
-        // Get data from Firebase db
+        // Gets data from Firebase db
         MainActivity.this._dbRef.push().setValue(job);
 
         // Notify
@@ -301,13 +328,12 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
     }
 
     /**
-     * Updates & refreshes the job's ListView
-     * @param newJobs list of new jobs, or null if only needs to be refreshed
+     * We use it because fucking java has no function's default param's value mechanism
+     * @param message the message to show
      */
-    public void updateJobs(@Nullable ArrayList<Job> newJobs)
+    public void notifyMessage(String message)
     {
-        this._jobs = null != newJobs ? newJobs : this._jobs;
-        this._populateJobsListView();
+        this.notifyMessage(message, Toast.LENGTH_SHORT);
     }
 
     /**
@@ -315,10 +341,11 @@ public class MainActivity extends AppCompatActivity implements AddReminderDialog
      * It notify using a small ellipse message box
      *
      * @param message the message to notify
+     * @param isLongDuration whether to use LOND_DELAY(3.5 sec) or SHORT DELAY(2 sec)
      */
-    public void notifyMessage(String message)
+    public void notifyMessage(String message, Integer isLongDuration)
     {
-        Toast toast = Toast.makeText(getApplicationContext(), message, Toast.LENGTH_SHORT);
+        Toast toast = Toast.makeText(getApplicationContext(), message, isLongDuration);
         toast.show();
     }
 }

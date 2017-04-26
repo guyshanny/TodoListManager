@@ -8,6 +8,10 @@ import android.os.Bundle;
 import android.support.v4.app.DialogFragment;
 
 import com.example.guy.ex2.actions.Action;
+import com.google.firebase.database.DatabaseReference;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by GUY on 4/4/2017.
@@ -24,20 +28,33 @@ public class ReminderOptionsDialog extends DialogFragment
     private Job _job;
     // A handle to main activity context (for further use in running reminder's actions)
     private Context _mainActivityContext;
+    // Node's db reference (needed to be able to delete the notification if 'cancel' was pressed)
+    DatabaseReference _jobReference;
 
     /**
      * Getter for the reminder's dialog's instance
      * @param job the job we handling
+     * @param jobReference the job's db node's reference
      * @param mainActivityContext the main activity context
      * @return an instance of the dialog
      */
-    public static ReminderOptionsDialog newInstance(Job job, Context mainActivityContext)
+    public static ReminderOptionsDialog newInstance(Job job, DatabaseReference jobReference, Context mainActivityContext)
     {
         ReminderOptionsDialog frag = new ReminderOptionsDialog();
         frag.setJobObj(job);
+        frag.setJobReference(jobReference);
         frag._mainActivityContext = mainActivityContext;
 
         return frag;
+    }
+
+    /**
+     * Setter for the job's db reference handle
+     * @param jobReference the job's db node's reference
+     */
+    public void setJobReference(DatabaseReference jobReference)
+    {
+        this._jobReference = jobReference;
     }
 
     /**
@@ -72,15 +89,15 @@ public class ReminderOptionsDialog extends DialogFragment
                         {
                             case "cancel":
                             {
-                                ReminderOptionsDialog.this._job.removeReminder();
-
-                                // Refresh ListView (to update job's reminder's date)
-                                MainActivity mainActivity = (MainActivity)ReminderOptionsDialog.this._mainActivityContext;
-                                mainActivity.updateJobs(null);
+                                // Removes job's reminder (by updating the node's 'jobReminder' child)
+                                Map<String, Object> childUpdates = new HashMap<>();
+                                childUpdates.put("jobReminder", null /*Hacky way to delete child*/);
+                                ReminderOptionsDialog.this._jobReference.updateChildren(childUpdates);
                             }
                             break;
                             case "call":
                             {
+                                // Starts dialer
                                 action.run(ReminderOptionsDialog.this._mainActivityContext);
                             }
                             break;

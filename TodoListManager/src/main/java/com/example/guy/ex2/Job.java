@@ -55,7 +55,13 @@ public class Job
             this.date = reminder.getDate();
         }
 
-
+        /**
+         * Getters && Setters (needed for the Firebase database processing
+         * This handles the db keys' names (not the internal variable's name)
+         *
+         * If there is a getter || setter that we don't want the db manager to process, just put
+         * a @Except before the method's deceleration
+         */
         public String getDescription() { return this.description; }
         public void setDescription(String description) { this.description = description; }
         public Map<String, Integer> getDate() { return this.date; }
@@ -166,13 +172,8 @@ public class Job
     }
 
     /**
-     * Removes the job's reminder
+     * {@inheritDoc}
      */
-    public void removeReminder()
-    {
-        this._reminder = null;
-    }
-
     @Override
     public String toString()
     {
